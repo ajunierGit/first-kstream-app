@@ -34,7 +34,8 @@ public class FirstKStream {
             ioe.printStackTrace();
         }
          
-        // *** Define KafkaStreams topology
+        // *** 
+        // Define KafkaStreams topology
         System.out.println("Build KStream");
         StreamsBuilder builder = new StreamsBuilder();
         KStream<String, String> inputStream = builder.stream(inputTopic);
@@ -42,7 +43,8 @@ public class FirstKStream {
         inputStream.to(outputTopic);
 
 
-        // *** Start Kafka Producer
+        // *** 
+        // Start Kafka Producer
         try {
             TopicProducer.runProducer();
         } catch (IOException ioe){
@@ -86,7 +88,7 @@ public class FirstKStream {
             e.printStackTrace();
             System.exit(1);  // Non-zero exit on error
         }
-
         System.exit(0);  // Clean exit
+
     }
 }
