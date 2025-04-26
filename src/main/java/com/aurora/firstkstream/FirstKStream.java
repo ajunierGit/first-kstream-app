@@ -21,9 +21,17 @@ public class FirstKStream {
         props.put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG, Serdes.String().getClass().getName());
         props.put(StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG, Serdes.String().getClass().getName());
 
-        final String inputTopic = "aurora.firstkstream.inputTopic";
-        final String outputTopic = "aurora.firstkstream.outputTopic";
-        
+        Properties properties;
+        String inputTopic = ""; 
+        String outputTopic = ""; 
+        try {
+            properties = Utils.loadProperties();
+            inputTopic = properties.getProperty("input.topic");
+            outputTopic = properties.getProperty("output.topic");
+        } catch (IOException ioe){
+            ioe.printStackTrace();
+        }
+         
         // Stream topology
         System.out.println("Build KStream");
         StreamsBuilder builder = new StreamsBuilder();

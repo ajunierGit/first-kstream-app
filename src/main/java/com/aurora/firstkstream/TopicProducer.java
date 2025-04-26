@@ -22,12 +22,7 @@ public class TopicProducer {
     public static final int PARTITIONS = 6;
     
     public static void runProducer() throws IOException {
-
-        final String inputTopic = "aurora.firstkstream.inputTopic";
-        final String outputTopic = "aurora.firstkstream.outputTopic";
-
-        // Create topics
-        System.out.println("Creating topics");
+        // Define Properties for topic creation
         Properties config = new Properties();
         config.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, "kafka:9092");
         config.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
@@ -35,6 +30,10 @@ public class TopicProducer {
 
         System.out.println("Starting admin client");
         try(Admin adminClient = Admin.create(config)){
+            Properties properties = Utils.loadProperties();
+            final String inputTopic = properties.getProperty("input.topic");
+            final String outputTopic = properties.getProperty("output.topic");
+
             System.out.println("Trying to create topics..");
             List<NewTopic> topics = List.of(
                 new NewTopic(inputTopic, PARTITIONS, REPLICATION_FACTOR),
@@ -43,13 +42,9 @@ public class TopicProducer {
             // This also returns exceptions in case of problems which helps for debugging
             adminClient.createTopics(topics).all().get();
             System.out.println("Topics created (or already exist)");
-        } catch (Exception e){
-            System.out.println("Error during topics creation..");
-            e.printStackTrace();
-        }
 
-        // Emit data to input topic
-        List<String> rawRecords = List.of("orderNumber-1001",
+            // Emit data to input topic
+            List<String> rawRecords = List.of("orderNumber-1001",
             "orderNumber-5000",
             "orderNumber-999",
             "orderNumber-3330",
@@ -57,20 +52,25 @@ public class TopicProducer {
             "bogus-2",
             "orderNumber-8400");
         
-        System.out.println("Starting Producer..");
-        Producer<String, String> producer = new KafkaProducer<>(config);
-        List<ProducerRecord<String, String>> producerRecords = rawRecords
-            .stream()
-            .map(r -> new ProducerRecord<>(inputTopic,"mykey", r))
-            .collect(Collectors.toList());
-        Callback producerCallback = (metadata, exception) -> {
-            if(exception != null) {
-                System.out.printf("Producing records encountered error %s %n", exception);
-            } else {
-                System.out.printf("Record produced - offset - %d timestamp - %d %n", metadata.offset(), metadata.timestamp());
-            }
+            System.out.println("Starting Producer..");
+            Producer<String, String> producer = new KafkaProducer<>(config);
+            List<ProducerRecord<String, String>> producerRecords = rawRecords
+                .stream()
+                .map(r -> new ProducerRecord<>(inputTopic,"mykey", r))
+                .collect(Collectors.toList());
+            Callback producerCallback = (metadata, exception) -> {
+                if(exception != null) {
+                    System.out.printf("Producing records encountered error %s %n", exception);
+                } else {
+                    System.out.printf("Record produced - offset - %d timestamp - %d %n", metadata.offset(), metadata.timestamp());
+                }
 
-        };
-        producerRecords.forEach((record -> producer.send(record, producerCallback)));
+            };
+            producerRecords.forEach((record -> producer.send(record, producerCallback)));
+        } catch (Exception e){
+            System.out.println("Error during topics creation..");
+            e.printStackTrace();
+        }
+
     }
 }
