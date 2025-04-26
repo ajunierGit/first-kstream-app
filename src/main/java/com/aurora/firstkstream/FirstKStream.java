@@ -8,6 +8,8 @@ import org.apache.kafka.streams.kstream.KStream;
 
 import java.io.IOException;
 import java.util.Properties;
+import java.util.concurrent.CountDownLatch;
+import org.apache.kafka.streams.errors.StreamsUncaughtExceptionHandler;
 
 public class FirstKStream {
 
@@ -32,29 +34,15 @@ public class FirstKStream {
             ioe.printStackTrace();
         }
          
-        // Stream topology
+        // *** Define KafkaStreams topology
         System.out.println("Build KStream");
         StreamsBuilder builder = new StreamsBuilder();
         KStream<String, String> inputStream = builder.stream(inputTopic);
         inputStream.peek((key, value) -> System.out.println("Message read - key " + key + " value " + value));
         inputStream.to(outputTopic);
 
-        // Start the stream
-        KafkaStreams stream = new KafkaStreams(builder.build(), props);
-        stream.setStateListener((newState, oldState) -> {
-            System.out.println("State changed from " + oldState + " to " + newState);
-        });
-        
-        stream.start();
 
-        // Register Shutdown hook for graceful shutdowns
-        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            System.out.println("Shutting down streams app...");
-            stream.close();
-            })
-        );
-
-        // Start Producer
+        // *** Start Kafka Producer
         try {
             TopicProducer.runProducer();
         } catch (IOException ioe){
@@ -62,12 +50,43 @@ public class FirstKStream {
             ioe.printStackTrace();
         }
 
-        // Prevent app from exiting
+        // *** 
+        // Start the KafkaStream application and handle shutdown and errors
+        // Start the streams
+        KafkaStreams streams = new KafkaStreams(builder.build(), props);
+        CountDownLatch latch = new CountDownLatch(1);
+
+        streams.setStateListener((newState, oldState) -> {
+            System.out.println("State changed from " + oldState + " to " + newState);
+        });
+
+        // Register Shutdown hook for graceful shutdowns
+        // The Hook close the stream and releases the latch
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            System.out.println("Shutting down streams app...");
+            streams.close();
+            latch.countDown();
+        }));
+
+        // Handle uncaught exceptions in stream threads
+        streams.setUncaughtExceptionHandler(ex -> {
+            System.out.println("Uncaught error in thread " + ex.getMessage());
+            ex.printStackTrace();
+            streams.close();
+            latch.countDown();
+            return StreamsUncaughtExceptionHandler.StreamThreadExceptionResponse.SHUTDOWN_APPLICATION;
+        });
+
+        // Start KafkaStream app and keep alive until latch is released
         try {
-            System.out.println("Sleep time...");
-            Thread.sleep(Long.MAX_VALUE);
-        } catch (InterruptedException e) {
+            streams.start();
+            latch.await();  // Block here until shutdown is requested
+        } catch (Throwable e) {
+            System.out.println("Fatal error: " + e.getMessage());
             e.printStackTrace();
+            System.exit(1);  // Non-zero exit on error
         }
+
+        System.exit(0);  // Clean exit
     }
 }
